@@ -3,6 +3,10 @@ import itertools
 from util.image_pool import ImagePool
 from .base_model import BaseModel
 from . import networks
+# import vgg16
+import torchvision.models as models
+
+
 
 
 class CycleGANModel(BaseModel):
@@ -74,6 +78,10 @@ class CycleGANModel(BaseModel):
                                         not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
         self.netG_B = networks.define_G(opt.output_nc, opt.input_nc, opt.ngf, opt.netG, opt.norm,
                                         not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
+
+        #20190722 import pretrained vgg16
+        self.vgg16 = models.vgg16(pretrained=True,progress=True)
+
 
         if self.isTrain:  # define discriminators
             self.netD_A = networks.define_D(opt.output_nc, opt.ndf, opt.netD,

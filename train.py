@@ -24,6 +24,9 @@ from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
 
+import matplotlib.pyplot as plt # for debug the picture
+from torchvision import transforms #
+
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
@@ -41,6 +44,16 @@ if __name__ == '__main__':
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
 
         for i, data in enumerate(dataset):  # inner loop within one epoch
+            toPIL=transforms.ToPILImage()
+            fig=plt.figure(figsize=(4,4))
+            for label in data:
+                if len(label)!=1:
+                    break
+                fig.add_subplot(2,1,ord(label)-ord('A')+1)
+                plt.imshow(toPIL(data[label].squeeze(0)))
+            plt.show()
+            #plt.imshow(toPIL(data['A'].squeeze(0)))
+            #plt.show()
             iter_start_time = time.time()  # timer for computation per iteration
             if total_iters % opt.print_freq == 0:
                 t_data = iter_start_time - iter_data_time
