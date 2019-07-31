@@ -4,6 +4,9 @@ from torch.nn import init
 import functools
 from torch.optim import lr_scheduler
 
+# import vgg16
+import torchvision.models as models
+
 
 ###############################################################################
 # Helper Functions
@@ -115,6 +118,9 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     init_weights(net, init_type, init_gain=init_gain)
     return net
 
+
+#define vgg_16_features
+#def vgg16_512(input_nc,)
 
 def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
     """Create a generator

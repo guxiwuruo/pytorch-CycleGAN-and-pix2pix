@@ -68,7 +68,7 @@ class CycleGANModel(BaseModel):
         self.visual_names = visual_names_A + visual_names_B  # combine visualizations for A and B
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
         if self.isTrain:
-            self.model_names = ['G_A', 'G_B', 'D_A', 'D_B']
+            self.model_names = ['G_A', 'G_B', 'D_A', 'D_B','vgg16_features_512']
         else:  # during test time, only load Gs
             self.model_names = ['G_A', 'G_B']
 
@@ -83,7 +83,12 @@ class CycleGANModel(BaseModel):
         #20190730 import vgg16
         self.vgg16_raw=models.vgg16(pretrained=True)
         self.vgg16_features=self.vgg16_raw.features
-        self.vgg16_features_512=self.vgg16_features.add_module("7*7 pool",nn.MaxPool2d(kernel_size=7))
+        self.netvgg16_features_512=nn.Sequential(self.vgg16_features,nn.MaxPool2d(kernel_size=7))
+        self.netvgg16_features_512.to(self.gpu_ids[0])
+        self.netvgg16_features_512 = torch.nn.DataParallel(self.netvgg16_features_512, self.gpu_ids)
+        print('pretrained vgg16.features is loaded')
+
+
 
         # inspect the output of vgg_classifier
         # x = torch.randn(1, 3, 224, 224)
@@ -110,7 +115,7 @@ class CycleGANModel(BaseModel):
             self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
 
             # 20190730 insert vgg_optimizer
-            self.optimize_vgg=torch.optim.Adam(self.vgg16_features_512.parameters(),lr=opt.lr,beta=(opt.beta1,0.999))
+            self.optimizer_vgg=torch.optim.Adam(self.netvgg16_features_512.parameters(),lr=opt.lr,betas=(opt.beta1,0.999))
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -136,12 +141,12 @@ class CycleGANModel(BaseModel):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.netG_A(self.real_A)  # G_A(A)
         self.rec_A = self.netG_B(self.fake_B)   # G_B(G_A(A))
-        self.emb_anc_A=self.vgg16_features_512(self.rec_A).view(-1) #vgg16(G_B(G_A(A)))
+        self.emb_anc_A=self.netvgg16_features_512(self.rec_A.detach()).view(-1) #vgg16(G_B(G_A(A)))
         self.fake_A = self.netG_B(self.real_B)  # G_B(B)
         self.rec_B = self.netG_A(self.fake_A)   # G_A(G_B(B))
-        self.emb_real_A=self.vgg16_features_512(self.real_A).view(-1) #vgg16(real_A)
+        self.emb_real_A=self.netvgg16_features_512(self.real_A).view(-1) #vgg16(real_A)
         #20190730 for the negative data
-        self.emb_neg_A=self.vgg16_features_512(self.neg_A).view(-1)
+        self.emb_neg_A=self.netvgg16_features_512(self.neg_A).view(-1)
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator
@@ -215,6 +220,7 @@ class CycleGANModel(BaseModel):
         # forward
         self.forward()      # compute fake images and reconstruction images.
         # G_A and G_B
+        self.set_requires_grad([self.netG_A, self.netG_B], True)
         self.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
         self.optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
         self.backward_G()             # calculate gradients for G_A and G_B
@@ -227,5 +233,7 @@ class CycleGANModel(BaseModel):
         self.optimizer_D.step()  # update D_A and D_B's weights
 
         #20190730 update vgg weights
+        self.set_requires_grad([self.netG_A,self.netG_B],False)
         self.backward_vgg()
-        self.optimize_vgg.step()
+        self.optimizer_vgg.step()
+
