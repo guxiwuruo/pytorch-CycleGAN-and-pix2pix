@@ -69,6 +69,7 @@ class CycleGANModel(BaseModel):
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
         if self.isTrain:
             self.model_names = ['G_A', 'G_B', 'D_A', 'D_B','vgg16_features_512']
+
         else:  # during test time, only load Gs
             self.model_names = ['G_A', 'G_B']
 
@@ -80,19 +81,7 @@ class CycleGANModel(BaseModel):
         self.netG_B = networks.define_G(opt.output_nc, opt.input_nc, opt.ngf, opt.netG, opt.norm,
                                         not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
 
-        #20190730 import vgg16
-        self.vgg16_raw=models.vgg16(pretrained=True)
-        self.vgg16_features=self.vgg16_raw.features
-        self.netvgg16_features_512=nn.Sequential(self.vgg16_features,nn.MaxPool2d(kernel_size=7))
-        self.netvgg16_features_512.to(self.gpu_ids[0])
-        self.netvgg16_features_512 = torch.nn.DataParallel(self.netvgg16_features_512, self.gpu_ids)
-        print('pretrained vgg16.features is loaded')
 
-
-
-        # inspect the output of vgg_classifier
-        # x = torch.randn(1, 3, 224, 224)
-        # y = self.vgg16_features(x)
 
 
         if self.isTrain:  # define discriminators
@@ -100,6 +89,17 @@ class CycleGANModel(BaseModel):
                                             opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
             self.netD_B = networks.define_D(opt.input_nc, opt.ndf, opt.netD,
                                             opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+            # 20190730 import vgg16
+            self.vgg16_raw = models.vgg16(pretrained=True)
+            self.vgg16_features = self.vgg16_raw.features
+            self.netvgg16_features_512 = nn.Sequential(self.vgg16_features, nn.MaxPool2d(kernel_size=7))
+            self.netvgg16_features_512.to(self.gpu_ids[0])
+            self.netvgg16_features_512 = torch.nn.DataParallel(self.netvgg16_features_512, self.gpu_ids)
+            print('pretrained vgg16.features is loaded')
+
+            # inspect the output of vgg_classifier
+            # x = torch.randn(1, 3, 224, 224)
+            # y = self.vgg16_features(x)
 
         if self.isTrain:
             if opt.lambda_identity > 0.0:  # only works when input and output images have the same number of channels
@@ -111,11 +111,11 @@ class CycleGANModel(BaseModel):
             self.criterionCycle = torch.nn.L1Loss()
             self.criterionIdt = torch.nn.L1Loss()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()), lr=opt.lr_gan, betas=(opt.beta1, 0.999))
+            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()), lr=opt.lr_gan, betas=(opt.beta1, 0.999))
 
             # 20190730 insert vgg_optimizer
-            self.optimizer_vgg=torch.optim.Adam(self.netvgg16_features_512.parameters(),lr=opt.lr,betas=(opt.beta1,0.999))
+            self.optimizer_vgg=torch.optim.Adam(self.netvgg16_features_512.parameters(),lr=opt.lr_cnn,betas=(opt.beta1,0.999))
 
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
@@ -209,7 +209,8 @@ class CycleGANModel(BaseModel):
         # cycle_gan_raw_loss
         #self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B
         # 20190806_guxiwuruo add L_emb = -d(E(self.real),E(G(self.real))
-        self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + 0.1*torch.dot(self.emb_real_A , self.emb_anc_A)
+        self.loss_vgg=torch.dot(self.netvgg16_features_512(self.real_A).view(-1),self.netvgg16_features_512(self.rec_A).view(-1))
+        self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + 0.1*self.loss_vgg
         self.loss_G.backward()
 
     #20190730 add embedding loss
@@ -225,8 +226,9 @@ class CycleGANModel(BaseModel):
         # forward
         self.forward()      # compute fake images and reconstruction images.
         # G_A and G_B
+
         self.set_requires_grad([self.netG_A, self.netG_B], True)
-        self.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
+        self.set_requires_grad([self.netD_A, self.netD_B,self.netvgg16_features_512], False)  # Ds require no gradients when optimizing Gs
         self.optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
         self.backward_G()             # calculate gradients for G_A and G_B
         self.optimizer_G.step()       # update G_A and G_B's weights
@@ -239,6 +241,9 @@ class CycleGANModel(BaseModel):
 
         #20190730 update vgg weights
         self.set_requires_grad([self.netG_A,self.netG_B],False)
+        self.set_requires_grad([self.netvgg16_features_512],True)
         self.backward_vgg()
         self.optimizer_vgg.step()
+
+
 
