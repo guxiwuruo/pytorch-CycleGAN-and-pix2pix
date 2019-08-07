@@ -57,7 +57,7 @@ class CycleGANModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B']
+        self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B','vgg']
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_A = ['real_A', 'fake_B', 'rec_A']
         visual_names_B = ['real_B', 'fake_A', 'rec_B']
@@ -210,9 +210,11 @@ class CycleGANModel(BaseModel):
         self.loss_G.backward()
 
     #20190730 add embedding loss
-    # self.similarity_AB = 1 -
+    # self.similarity_AB = 1 - AB
     def backward_vgg(self):
-        self.loss_vgg=nn.MarginRankingLoss(margin=0.1).forward(self.emb_neg_A,self.emb_real_A,self.emb_anc_A)
+        #self.loss_vgg=nn.MarginRankingLoss(margin=0.1).forward(self.emb_neg_A,self.emb_real_A,self.emb_anc_A)
+        tripleloss=nn.TripletMarginLoss(margin=0.1, p=2)
+        self.loss_vgg=tripleloss(self.emb_anc_A.unsqueeze(0),self.emb_real_A.unsqueeze(0),self.emb_neg_A.unsqueeze(0))
         self.loss_vgg.backward()
 
     def optimize_parameters(self):
