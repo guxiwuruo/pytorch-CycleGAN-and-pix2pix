@@ -112,6 +112,44 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
     return transforms.Compose(transform_list)
 
 
+#20190807 refix for the triple input
+def get_transform_triple(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
+    transform_list = []
+    # preserve aspect ratio and fill the extra pixels with 0s
+    if 'pad' in opt.pad:
+       transform_list.append(transforms.Lambda(lambda img:__pad_image(img,(256,256))))
+    if grayscale:
+        transform_list.append(transforms.Grayscale(1))
+    if 'resize' in opt.preprocess:
+        osize = [opt.load_size, opt.load_size]
+        transform_list.append(transforms.Resize(osize, method))
+    elif 'scale_width' in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.load_size, method)))
+
+    if 'crop' in opt.preprocess:
+        if params is None:
+            transform_list.append(transforms.RandomCrop(opt.crop_size))
+        else:
+            transform_list.append(transforms.Lambda(lambda img: __crop(img, params['crop_pos'], opt.crop_size)))
+
+    if opt.preprocess == 'none':
+        transform_list.append(transforms.Lambda(lambda img: __make_power_2(img, base=4, method=method)))
+
+    if not opt.no_flip:
+        if params is None:
+            transform_list.append(transforms.RandomHorizontalFlip())
+        elif params['flip']:
+            transform_list.append(transforms.Lambda(lambda img: __flip(img, params['flip'])))
+
+    if convert:
+        transform_list += [transforms.ToTensor()]
+        if grayscale:
+            transform_list += [transforms.Normalize((0.5,), (0.5,))]
+        else:
+            transform_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+    return transforms.Compose(transform_list)
+
+
 def __make_power_2(img, base, method=Image.BICUBIC):
     ow, oh = img.size
     h = int(round(oh / base) * base)
@@ -155,3 +193,25 @@ def __print_size_warning(ow, oh, w, h):
               "(%d, %d). This adjustment will be done to all images "
               "whose sizes are not multiples of 4" % (ow, oh, w, h))
         __print_size_warning.has_printed = True
+
+# to pad
+def __pad_image(image, target_size):
+    iw, ih = image.size  # 原始图像的尺寸
+    w, h = target_size  # 目标图像的尺寸
+    scale = min(w / iw, h / ih)  # 转换的最小比例
+
+    # 保证长或宽，至少一个符合目标图像的尺寸
+    nw = int(iw * scale)
+    nh = int(ih * scale)
+
+    image = image.resize((nw, nh), Image.BICUBIC)  # 缩小图像
+    #image.show()
+    new_image = Image.new('RGB', target_size, (255, 255, 255))  # 生成灰色图像
+    # // 为整数除法，计算图像的位置
+    new_image.paste(image, ((w - nw) // 2, (h - nh) // 2))  # 将图像填充为中间图像，两侧为灰色的样式
+    #new_image.show()
+
+    return new_image
+    #---------------------
+    #版权声明：本文为CSDN博主「SpikeKing」的原创文章，遵循CC 4.0 by-sa版权协议，转载请附上原文出处链接及本声明。
+    #原文链接：https://blog.csdn.net/caroline_wendy/article/details/80881229

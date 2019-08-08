@@ -66,7 +66,7 @@ class UnalignedDataset(BaseDataset):
         A = self.transform_A(A_img)
         B = self.transform_B(B_img)
         # test data input
-        C = self.transform_A(A_img)
+        C = self.transform_A(C_img)
 
 
         return {'A': A, 'B': B, 'C':C, 'A_paths': A_path, 'B_paths': B_path,'C_paths':A_path}
