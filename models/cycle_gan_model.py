@@ -71,7 +71,14 @@ class CycleGANModel(BaseModel):
             self.model_names = ['G_A', 'G_B', 'D_A', 'D_B','vgg16_features_512']
 
         else:  # during test time, only load Gs
-            self.model_names = ['G_A', 'G_B']
+            self.model_names = ['G_A', 'G_B','vgg16_features_512']
+            # 20190808 for test , to get loss of vgg
+            self.vgg16_raw = models.vgg16(pretrained=False)
+            self.vgg16_features = self.vgg16_raw.features
+            self.netvgg16_features_512 = nn.Sequential(self.vgg16_features, nn.MaxPool2d(kernel_size=7))
+            self.netvgg16_features_512.to(self.gpu_ids[0])
+            self.netvgg16_features_512 = torch.nn.DataParallel(self.netvgg16_features_512, self.gpu_ids)
+            print('pretrained vgg16.features is loaded')
 
         # define networks (both Generators and discriminators)
         # The naming is different from those used in the paper.
