@@ -8,6 +8,9 @@ import torch.nn as nn
 # import vgg16
 import torchvision.models as models
 
+#20190812 for l2 norm
+import torch.nn.functional as F
+
 
 
 class CycleGANModel(BaseModel):
@@ -57,7 +60,7 @@ class CycleGANModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B','vgg']
+        self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B','vgg_emb','vgg_tri']
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_A = ['real_A', 'fake_B', 'rec_A']
         visual_names_B = ['dom_B', 'fake_A', 'rec_B']
@@ -226,8 +229,9 @@ class CycleGANModel(BaseModel):
         # cycle_gan_raw_loss
         #self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B
         # 20190806_guxiwuruo add L_emb = -d(E(self.real),E(G(self.real))
-        self.loss_vgg=1-torch.dot(self.netvgg16_features_512(self.real_A).view(-1),self.netvgg16_features_512(self.rec_A).view(-1))
-        self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + 0.1*self.loss_vgg
+        self.loss_vgg_emb=1-torch.dot(F.normalize(self.netvgg16_features_512(self.real_A),p=2,dim=1).view(-1),
+                                  F.normalize(self.netvgg16_features_512(self.rec_A),p=2,dim=1).view(-1))
+        self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + 0.1*self.loss_vgg_emb
         self.loss_G.backward()
 
     #20190730 add embedding loss
@@ -235,8 +239,10 @@ class CycleGANModel(BaseModel):
     def backward_vgg(self):
         #self.loss_vgg=nn.MarginRankingLoss(margin=0.1).forward(self.emb_neg_A,self.emb_real_A,self.emb_anc_A)
         tripleloss=nn.TripletMarginLoss(margin=0.1, p=2)
-        self.loss_vgg=tripleloss(self.emb_anc_A.unsqueeze(0),self.emb_real_A.unsqueeze(0),self.emb_neg_A.unsqueeze(0))
-        self.loss_vgg.backward()
+        self.loss_vgg_tri=tripleloss(F.normalize(self.emb_anc_A.unsqueeze(0),p=2,dim=1),
+                                 F.normalize(self.emb_real_A.unsqueeze(0),p=2,dim=1),
+                                 F.normalize(self.emb_neg_A.unsqueeze(0),p=2,dim=1))
+        self.loss_vgg_tri.backward()
 
     def optimize_parameters(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""

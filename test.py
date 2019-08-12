@@ -61,7 +61,7 @@ if __name__ == '__main__':
         model.set_input(data)  # unpack data from data loader
 
         #20190812 to show data
-        data['pos'].data
+        #data['pos'].data
 
         #20190812 debug for the intermediate layer output
         test_model_output2=nn.Sequential(*list((model.netvgg16_features_512.children()))[0][0][:-2])(data['pos'].to(model.device))
