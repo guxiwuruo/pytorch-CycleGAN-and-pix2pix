@@ -147,9 +147,10 @@ class CycleGANModel(BaseModel):
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
         """
         #input for triple_loss
-        self.real_A=input[0].to(self.device)
-        self.neg_A=input[1].to(self.device)
-        self.dom_B=input[2].to(self.device)
+        self.real_A=input['pos'].to(self.device) # positive image
+        self.neg_A=input['neg'].to(self.device)
+        self.dom_B=input['dom'].to(self.device)
+        self.image_paths = input['pos_path'] # for positive image
 
 
 
@@ -225,7 +226,7 @@ class CycleGANModel(BaseModel):
         # cycle_gan_raw_loss
         #self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B
         # 20190806_guxiwuruo add L_emb = -d(E(self.real),E(G(self.real))
-        self.loss_vgg=torch.dot(self.netvgg16_features_512(self.real_A).view(-1),self.netvgg16_features_512(self.rec_A).view(-1))
+        self.loss_vgg=1-torch.dot(self.netvgg16_features_512(self.real_A).view(-1),self.netvgg16_features_512(self.rec_A).view(-1))
         self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B + 0.1*self.loss_vgg
         self.loss_G.backward()
 

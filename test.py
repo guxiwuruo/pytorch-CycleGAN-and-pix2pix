@@ -33,6 +33,8 @@ from models import create_model
 from util.visualizer import save_images
 from util import html
 
+# 20190812 debug intermediate layer
+import torch.nn as nn
 
 if __name__ == '__main__':
     opt = TestOptions().parse()  # get test options
@@ -57,7 +59,23 @@ if __name__ == '__main__':
         if i >= opt.num_test:  # only apply our model to opt.num_test images.
             break
         model.set_input(data)  # unpack data from data loader
-        model.test()           # run inference
+
+        #20190812 to show data
+        data['pos'].data
+
+        #20190812 debug for the intermediate layer output
+        test_model_output2=nn.Sequential(*list((model.netvgg16_features_512.children()))[0][0][:-2])(data['pos'].to(model.device))
+        test_model_output3 = nn.Sequential(*list((model.netvgg16_features_512.children()))[0][0][:-3])(
+            data['pos'].to(model.device))
+        test_model_output4 = nn.Sequential(*list((model.netvgg16_features_512.children()))[0][0][:-4])(
+            data['pos'].to(model.device))
+        test_model_output5 = nn.Sequential(*list((model.netvgg16_features_512.children()))[0][0][:-5])(
+            data['pos'].to(model.device))
+        test_model_output6 = nn.Sequential(*list((model.netvgg16_features_512.children()))[0][0][:-6])(
+            data['pos'].to(model.device))
+        model.test() # run inference
+        feature = model.netvgg16_features_512(data['dom']) # to get object feature
+
         visuals = model.get_current_visuals()  # get image results
         img_path = model.get_image_paths()     # get image paths
         if i % 5 == 0:  # save images to an HTML file
