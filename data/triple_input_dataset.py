@@ -1,5 +1,5 @@
 import os.path
-from data.base_dataset import BaseDataset, get_transform
+from data.base_dataset import BaseDataset, get_transform_triple
 from data.image_folder import make_dataset
 from PIL import Image
 import numpy as np
@@ -18,8 +18,24 @@ class tripleinputdataset(BaseDataset):
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         BaseDataset.__init__(self, opt)
-        #self.dir_A = os.path.join(opt.dataroot, opt.phase + 'A')  # create a path '/path/to/data/trainA'
-        #self.dir_B = os.path.join(opt.dataroot, opt.phase + 'B')  # create a path '/path/to/data/trainB'
+
+        ''' raw for CycleGan
+        self.dir_A = os.path.join(opt.dataroot, opt.phase + 'A')  # create a path '/path/to/data/trainA'
+        self.dir_B = os.path.join(opt.dataroot, opt.phase + 'B')  # create a path '/path/to/data/trainB'
+        
+        self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))   # load images from '/path/to/data/trainA'
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))    # load images from '/path/to/data/trainB'
+        self.A_size = len(self.A_paths)  # get the size of dataset A
+        self.B_size = len(self.B_paths)  # get the size of dataset B
+        btoA = self.opt.direction == 'BtoA'
+        input_nc = self.opt.output_nc if btoA else self.opt.input_nc       # get the number of channels of input image
+        output_nc = self.opt.input_nc if btoA else self.opt.output_nc      # get the number of channels of output image
+        self.transform_A = get_transform(self.opt, grayscale=(input_nc == 1))
+        self.transform_B = get_transform(self.opt, grayscale=(output_nc == 1))
+        '''
+
+
+        #v1.0
         self.GroceryPath=os.path.join(opt.dataroot,opt.phase+'_grocery')
         self.DomainPath=os.path.join(opt.dataroot,opt.phase+'_domain')
         self.filelist = os.listdir(self.GroceryPath)
@@ -49,20 +65,25 @@ class tripleinputdataset(BaseDataset):
 
 
         self.label_data = label_data
-        self.transform=get_transform(self.opt,grayscale=False)
+        self.transform=get_transform_triple(self.opt,grayscale=False)
+        '''
+
+        #20190812 v2.0 guxiwuruo
+        self.dir_GroceryPosPath = os.path.join(opt.dataroot, opt.phase + '_pos_grocery')
+        self.dir_GroceryNegPath = os.path.join(opt.dataroot, opt.phase + '_neg_grocery')
+        self.DomPath = os.path.join(opt.dataroot, opt.phase + '_domain')
+        self.GroceryPosPath= sorted(make_dataset(self.dir_GroceryPosPath, opt.max_dataset_size))
+        self.GroceryNegPath = sorted(make_dataset(self.dir_GroceryNegPath, opt.max_dataset_size))
+        '''
+
+
+
+        #self.transform = get_transform(self.opt, grayscale=False)
+
+
         #for get_transform  tomorrow
 
-        '''
-        self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))   # load images from '/path/to/data/trainA'
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))    # load images from '/path/to/data/trainB'
-        self.A_size = len(self.A_paths)  # get the size of dataset A
-        self.B_size = len(self.B_paths)  # get the size of dataset B
-        btoA = self.opt.direction == 'BtoA'
-        input_nc = self.opt.output_nc if btoA else self.opt.input_nc       # get the number of channels of input image
-        output_nc = self.opt.input_nc if btoA else self.opt.output_nc      # get the number of channels of output image
-        self.transform_A = get_transform(self.opt, grayscale=(input_nc == 1))
-        self.transform_B = get_transform(self.opt, grayscale=(output_nc == 1))
-        '''
+
 
     def __getitem__(self,index):
         """Return a data point and its metadata information.
@@ -127,6 +148,9 @@ class tripleinputdataset(BaseDataset):
                 negative_name = np.random.choice(data)
                 break
         '''
+
+        #v1.0
+        
         pos_neg=random.sample(self.label_data,2)
         positive_name=random.sample(pos_neg[0][1],1)
         negative_name=random.sample(pos_neg[1][1],1)
@@ -143,6 +167,9 @@ class tripleinputdataset(BaseDataset):
                 'pos_path':os.path.join(self.GroceryPath, positive_name[0]),
                 'neg_path':os.path.join(self.GroceryPath, negative_name[0]),
                 'dom_path':os.path.join(self.DomainPath,np.random.choice(os.listdir(self.DomainPath)))}
+        
+
+
 
 
 

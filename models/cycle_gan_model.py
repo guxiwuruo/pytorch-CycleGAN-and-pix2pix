@@ -240,8 +240,8 @@ class CycleGANModel(BaseModel):
         #self.loss_vgg=nn.MarginRankingLoss(margin=0.1).forward(self.emb_neg_A,self.emb_real_A,self.emb_anc_A)
         tripleloss=nn.TripletMarginLoss(margin=0.1, p=2)
         self.loss_vgg_tri=tripleloss(F.normalize(self.emb_anc_A.unsqueeze(0),p=2,dim=1),
-                                 F.normalize(self.emb_real_A.unsqueeze(0),p=2,dim=1),
-                                 F.normalize(self.emb_neg_A.unsqueeze(0),p=2,dim=1))
+                                     F.normalize(self.emb_real_A.unsqueeze(0),p=2,dim=1),
+                                     F.normalize(self.emb_neg_A.unsqueeze(0),p=2,dim=1))
         self.loss_vgg_tri.backward()
 
     def optimize_parameters(self):

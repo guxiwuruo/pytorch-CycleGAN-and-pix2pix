@@ -147,6 +147,8 @@ def get_transform_triple(opt, params=None, grayscale=False, method=Image.BICUBIC
             transform_list += [transforms.Normalize((0.5,), (0.5,))]
         else:
             transform_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+
+
     return transforms.Compose(transform_list)
 
 
@@ -206,7 +208,7 @@ def __pad_image(image, target_size):
 
     image = image.resize((nw, nh), Image.BICUBIC)  # 缩小图像
     #image.show()
-    new_image = Image.new('RGB', target_size, (255, 255, 255))  # 生成灰色图像
+    new_image = Image.new('RGB', target_size, (127, 127, 127))  # 生成灰色图像
     # // 为整数除法，计算图像的位置
     new_image.paste(image, ((w - nw) // 2, (h - nh) // 2))  # 将图像填充为中间图像，两侧为灰色的样式
     #new_image.show()
