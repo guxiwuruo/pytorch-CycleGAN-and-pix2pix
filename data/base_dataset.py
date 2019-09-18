@@ -84,9 +84,13 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
         transform_list.append(transforms.Grayscale(1))
     if 'resize' in opt.preprocess:
         osize = [opt.load_size, opt.load_size]
-        transform_list.append(transforms.Resize(osize, method))
+        #transform_list.append(transforms.Resize(osize, method))
+        # 20190918 guxiwuruo pad the edge with zeros and preserve the ratio
+        transform_list.append(transforms.Lambda(lambda img: __pad_image(img, osize)))
     elif 'scale_width' in opt.preprocess:
         transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.load_size, method)))
+
+
 
     if 'crop' in opt.preprocess:
         if params is None:
@@ -155,3 +159,26 @@ def __print_size_warning(ow, oh, w, h):
               "(%d, %d). This adjustment will be done to all images "
               "whose sizes are not multiples of 4" % (ow, oh, w, h))
         __print_size_warning.has_printed = True
+
+# 20190918 guxiwuruo
+# to pad
+def __pad_image(image, target_size):
+    iw, ih = image.size  # 原始图像的尺寸
+    w, h = target_size  # 目标图像的尺寸
+    scale = min(w / iw, h / ih)  # 转换的最小比例
+
+    # 保证长或宽，至少一个符合目标图像的尺寸
+    nw = int(iw * scale)
+    nh = int(ih * scale)
+    #image.show() # debug
+    image = image.resize((nw, nh), Image.BICUBIC)  # 缩小图像
+    #image.show()
+    new_image = Image.new('RGB', target_size, (0, 0, 0))  # 生成灰色图像
+    # // 为整数除法，计算图像的位置
+    new_image.paste(image, ((w - nw) // 2, (h - nh) // 2))  # 将图像填充为中间图像，两侧为灰色的样式
+    #new_image.show()
+
+    return new_image
+    #---------------------
+    #版权声明：本文为CSDN博主「SpikeKing」的原创文章，遵循CC 4.0 by-sa版权协议，转载请附上原文出处链接及本声明。
+    #原文链接：https://blog.csdn.net/caroline_wendy/article/details/80881229
